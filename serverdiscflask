@@ -1,0 +1,46 @@
+# Configura el bot
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+app = Flask(__name__)
+
+# Ruta para recibir el archivo desde VBA
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return "No se envió ningún archivo", 400
+    file = request.files['file']
+
+    # Guarda el archivo en el servidor temporalmente
+    filename = file.filename
+    file.save(filename)
+
+    # Envía el archivo al canal de Discord
+    async def send_file_to_discord():
+        channel = bot.get_channel("*")
+        if channel:
+            with open(filename, 'rb') as f:
+                discord_file = discord.File(f)
+                await channel.send("Archivo recibido:", file=discord_file)
+
+        # Elimina el archivo después de enviarlo
+        os.remove(filename)
+
+
+        # Ejecuta la función en el bucle de eventos del bot
+    bot.loop.create_task(send_file_to_discord())
+
+    return "Archivo subido exitosamente", 200
+
+def run_bot():
+    bot.run('*')  # Coloca aquí el token del bot
+
+if __name__ == "__main__":
+    #app.run(host="0.0.0.0", port=5000)
+        # Crea un hilo para ejecutar el bot
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.start()
+
+    # Ejecuta Flask en el hilo principal
+    app.run(debug=True, use_reloader=False) 
