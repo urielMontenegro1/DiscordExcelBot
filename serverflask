@@ -1,0 +1,65 @@
+from flask import Flask, request, jsonify
+import requests
+import os
+import discord
+from threading import Thread
+
+# Inicializar la aplicación Flask
+app = Flask(__name__)
+
+
+# Ruta para subir archivos a Discord
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    # Verificar si hay un archivo en la solicitud
+    if 'file' not in request.json:
+        return jsonify({"error": "No file part"}), 400
+
+    # Obtener la ruta del archivo
+    file_path = request.json['file']
+
+    # Verificar si el archivo existe
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found"}), 404
+
+    # Subir el archivo a Discord
+    url = f"https://discord.com/api/v9/channels/{DISCORD_CHANNEL_ID}/messages"
+    headers = {
+        "Authorization": f"Bot {DISCORD_TOKEN}"
+    }
+
+    with open(file_path, "rb") as archivo:
+        files = {
+            "file": (os.path.basename(file_path), archivo, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')  # Cambia el tipo según el archivo
+        }
+        response = requests.post(url, headers=headers, files=files)
+
+    if response.status_code == 200:
+        return "Archivo subido a Discord correctamente.", 200
+    else:
+        return f"Error al subir archivo a Discord. Status: {response.status_code}", 500
+
+# Función para mantener el servidor Flask activo
+def run_flask():
+    app.run(host="0.0.0.0", port=5000)
+
+# Función para ejecutar Flask en segundo plano
+def keep_alive():
+    t = Thread(target=run_flask)
+    t.start()
+
+# Configuración del bot de Discord
+intents = discord.Intents.default()
+client = discord.Client(intents=intents)
+
+# Evento de Discord cuando el bot esté listo
+@client.event
+async def on_ready():
+    print(f'Bot conectado como {client.user}')
+
+if __name__ == "__main__":
+    # Iniciar Flask en segundo plano para mantener el bot activo
+    keep_alive()
+
+    # Iniciar el bot de Discord
+    client.run(DISCORD_TOKEN)
