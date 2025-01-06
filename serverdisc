@@ -1,0 +1,14 @@
+import discord
+
+# Configurar los intents que usará el bot
+intents = discord.Intents.default()  # Usar los intents predeterminados (sin eventos especiales)
+intents.message_content = True  # Permitir que el bot lea el contenido de los mensajes
+
+# Inicializar el cliente de Discord con intents
+client = discord.Client(intents=intents)
+
+# Cuando el bot se conecta y está listo
+@client.event
+async def on_ready():
+    print(f'Bot conectado como {client.user}')
+# Coloca aquí el token del bot
