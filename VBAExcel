@@ -1,0 +1,140 @@
+
+Sub GuardarArchivoYNotificarBot()
+    Dim archivo As String
+    Dim ruta As String
+    Dim http As Object
+    Dim json As Object
+    Dim dict As Object ' Para almacenar el JSON
+    Dim fd As Object
+    Dim stream As Object
+    
+    ' Ruta donde deseas guardar el archivo
+    ruta = "C:\tmp\"
+    archivo = ThisWorkbook.FullName ' Guarda el archivo actual
+
+
+    ' Guardar el archivo en la carpeta especificada
+    ThisWorkbook.SaveCopyAs ruta & ThisWorkbook.Name
+    
+    
+
+
+    ' Crear el objeto HTTP para hacer la solicitud
+   ' Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    
+    
+     ' Crear un objeto Dictionary para el JSON
+    Set dict = CreateObject("Scripting.Dictionary")
+    dict.Add "file", ruta & ThisWorkbook.Name ' Agrega la ruta del archivo
+
+
+    If Dir(ruta & ThisWorkbook.Name) = "" Then
+    MsgBox "El archivo no se encontró en la ruta especificada."
+    Exit Sub
+    End If
+    
+    ' Configura la solicitud POST
+    http.Open "POST", "http://localhost:5000/upload", False
+    'http.Open "POST", "https://04571423-1ce7-4186-b1d9-b46bd8e70c9d-00-10cjkwavn09yl.picard.replit.dev:8080/upload", False
+    http.setRequestHeader "Content-Type", "application/json"
+    
+    
+ 
+        ' Enviar la solicitud al servidor Flask
+    http.Send JsonConverter.ConvertToJson(dict) ' Usa el objeto Dictionary aquí
+    
+   
+    
+
+
+    ' Comprobar la respuesta del servidor
+    If http.Status = 200 Then
+        MsgBox "Archivo guardado y notificación enviada al bot."
+    Else
+        MsgBox "Error al enviar notificación: " & http.Status & " - " & http.responseText
+    End If
+End Sub
+
+
+Sub GuardarArchivoYNotificarBotFlask()
+Dim archivo As String
+    Dim ruta As String
+    Dim http As Object
+    Dim fileData() As Byte
+    Dim fileNumber As Integer
+    Dim boundary As String
+    Dim body As String
+
+    ' Ruta donde deseas guardar el archivo
+    ruta = "C:\tmp\" ' Asegúrate de que esta carpeta exista
+    archivo = ThisWorkbook.Name ' Obtiene el nombre del archivo actual
+
+    ' Guardar el archivo en la carpeta especificada
+    ThisWorkbook.SaveCopyAs ruta & archivo ' Concatenar ruta y nombre del archivo
+
+    ' Leer el archivo como un arreglo de bytes
+    fileNumber = FreeFile
+    Open ruta & archivo For Binary Access Read As #fileNumber
+        ReDim fileData(0 To LOF(fileNumber) - 1) ' Redimensionar el arreglo
+        Get #fileNumber, , fileData ' Leer el archivo en el arreglo
+    Close #fileNumber
+
+    ' Crear el objeto HTTP para hacer la solicitud
+    Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+
+    ' Generar un boundary único para el formulario
+    boundary = "---------------------------" & Format(Now(), "yyyymmddhhmmss")
+
+    ' Configura la solicitud POST
+    http.Open "POST", "https://04571423-1ce7-4186-b1d9-b46bd8e70c9d-00-10cjkwavn09yl.picard.replit.dev:8080/upload", False
+    http.setRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
+
+    ' Crear el cuerpo de la solicitud
+    body = "--" & boundary & vbCrLf
+    body = body & "Content-Disposition: form-data; name=""file""; filename=""" & archivo & """" & vbCrLf
+    body = body & "Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" & vbCrLf
+    body = body & vbCrLf
+
+    ' Convertir el cuerpo a un arreglo de bytes
+    Dim bodyData() As Byte
+    bodyData = StrConv(body, vbFromUnicode)
+
+    ' Combinar el cuerpo con el archivo
+    Dim finalData() As Byte
+    ReDim finalData(0 To UBound(bodyData) + UBound(fileData) + 1)
+
+    Dim i As Long
+    For i = 0 To UBound(bodyData)
+        finalData(i) = bodyData(i)
+    Next i
+
+    For i = 0 To UBound(fileData)
+        finalData(i + UBound(bodyData) + 1) = fileData(i)
+    Next i
+
+    ' Añadir el final del boundary
+    Dim boundaryEnd As String
+    boundaryEnd = vbCrLf & "--" & boundary & "--" & vbCrLf
+    Dim boundaryEndData() As Byte
+    boundaryEndData = StrConv(boundaryEnd, vbFromUnicode)
+
+    ' Combinar el final del boundary
+    Dim finalDataLength As Long
+    finalDataLength = UBound(finalData) + 1 + UBound(boundaryEndData) + 1
+    ReDim Preserve finalData(0 To finalDataLength)
+
+    For i = 0 To UBound(boundaryEndData)
+        finalData(UBound(finalData) - UBound(boundaryEndData) + i) = boundaryEndData(i)
+    Next i
+
+    ' Enviar el archivo al servidor
+    http.Send finalData ' Enviar el arreglo combinado
+
+    ' Comprobar la respuesta del servidor
+    If http.Status = 200 Then
+        MsgBox "Archivo guardado y notificación enviada al bot."
+    Else
+        MsgBox "Error al enviar notificación: " & http.Status & " - " & http.responseText
+    End If
+End Sub
